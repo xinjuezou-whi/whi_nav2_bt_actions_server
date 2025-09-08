@@ -52,21 +52,10 @@ set(dependencies
 )
 
 # plugins
-# add_library(simple_progress_checker SHARED plugins/simple_progress_checker.cpp)
-# ament_target_dependencies(simple_progress_checker ${dependencies})
-# # prevent pluginlib from using boost
-# target_compile_definitions(simple_progress_checker PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
-
-# add_library(simple_goal_checker SHARED plugins/simple_goal_checker.cpp)
-# ament_target_dependencies(simple_goal_checker ${dependencies})
-# # prevent pluginlib from using boost
-# target_compile_definitions(simple_goal_checker PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
-
-# add_library(stopped_goal_checker SHARED plugins/stopped_goal_checker.cpp)
-# target_link_libraries(stopped_goal_checker simple_goal_checker)
-# ament_target_dependencies(stopped_goal_checker ${dependencies})
-# # prevent pluginlib from using boost
-# target_compile_definitions(stopped_goal_checker PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+add_library(spin_to_path SHARED plugins/spin_to_path.cpp)
+ament_target_dependencies(spin_to_path ${dependencies})
+# prevent pluginlib from using boost
+target_compile_definitions(spin_to_path PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 
 ament_target_dependencies(${library_name}
   ${dependencies}
@@ -90,8 +79,7 @@ ament_target_dependencies(${executable_name}
 
 target_link_libraries(${executable_name} ${library_name})
 
-# install(TARGETS simple_progress_checker simple_goal_checker stopped_goal_checker ${library_name}
-install(TARGETS ${library_name}
+install(TARGETS spin_to_path ${library_name}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
