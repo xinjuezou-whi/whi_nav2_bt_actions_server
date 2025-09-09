@@ -24,7 +24,7 @@ namespace whi_nav2_bt_actions_server
 		, prev_yaw_(0.0)
 	{
 		/// node version and copyright announcement
-		std::cout << "\nWHI bt action spin to path VERSION 00.00.1" << std::endl;
+		std::cout << "\nWHI bt action spin to path VERSION 00.00.2" << std::endl;
 		std::cout << "Copyright © 2025-2026 Wheel Hub Intelligent Co.,Ltd. All rights reserved\n" << std::endl;
 	}
 
@@ -32,17 +32,17 @@ namespace whi_nav2_bt_actions_server
 
 	void SpinToPath::onConfigure()
 	{
-		nav2_util::declare_parameter_if_not_declared(node_, "simulate_ahead_time", rclcpp::ParameterValue(2.0));
-		node_->get_parameter("simulate_ahead_time", simulate_ahead_time_);
+		nav2_util::declare_parameter_if_not_declared(node_, action_name_ + ".simulate_ahead_time", rclcpp::ParameterValue(2.0));
+		node_->get_parameter(action_name_ + ".simulate_ahead_time", simulate_ahead_time_);
 
-		nav2_util::declare_parameter_if_not_declared(node_, "max_rotational_vel", rclcpp::ParameterValue(1.0));
-		node_->get_parameter("max_rotational_vel", max_rotational_vel_);
+		nav2_util::declare_parameter_if_not_declared(node_, action_name_ + ".min_rotational_vel", rclcpp::ParameterValue(0.1));
+		node_->get_parameter(action_name_ + ".min_rotational_vel", min_rotational_vel_);
 
-		nav2_util::declare_parameter_if_not_declared(node_, "min_rotational_vel", rclcpp::ParameterValue(0.4));
-		node_->get_parameter("min_rotational_vel", min_rotational_vel_);
+		nav2_util::declare_parameter_if_not_declared(node_, action_name_ + ".max_rotational_vel", rclcpp::ParameterValue(1.0));
+		node_->get_parameter(action_name_ + ".max_rotational_vel", max_rotational_vel_);
 
-		nav2_util::declare_parameter_if_not_declared(node_, "rotational_acc_lim", rclcpp::ParameterValue(3.2));
-		node_->get_parameter("rotational_acc_lim", rotational_acc_lim_);
+		nav2_util::declare_parameter_if_not_declared(node_, action_name_ + ".rotational_acc_lim", rclcpp::ParameterValue(1.57));
+		node_->get_parameter(action_name_ + ".rotational_acc_lim", rotational_acc_lim_);
 	}
 
 	Status SpinToPath::onRun(const std::shared_ptr<const SpinToPathAction::Goal> Command)
@@ -138,8 +138,8 @@ namespace whi_nav2_bt_actions_server
 		return Status::RUNNING;
 	}
 
-	bool SpinToPath::isCollisionFree(const double& RelativeYaw,
-		const geometry_msgs::msg::Twist& CmdVel, geometry_msgs::msg::Pose2D& Pose2d)
+	bool SpinToPath::isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,
+		geometry_msgs::msg::Pose2D& Pose2d)
 	{
 		// Simulate ahead by simulate_ahead_time_ in cycle_frequency_ increments
 		int cycle_count = 0;

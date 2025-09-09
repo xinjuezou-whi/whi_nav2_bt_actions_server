@@ -38,13 +38,11 @@ namespace whi_nav2_bt_actions_server
 		declare_parameter("footprint_topic",
 			rclcpp::ParameterValue(std::string("local_costmap/published_footprint")));
 		declare_parameter("cycle_frequency", rclcpp::ParameterValue(10.0));
-		declare_parameter("recovery_plugins", default_ids_);
+		declare_parameter("action_plugins", default_ids_);
 
-		declare_parameter("global_frame",
-			rclcpp::ParameterValue(std::string("odom")));
-		declare_parameter("robot_base_frame",
-			rclcpp::ParameterValue(std::string("base_link")));
-		declare_parameter("transform_tolerance", rclcpp::ParameterValue(0.1));
+		declare_parameter("global_frame", rclcpp::ParameterValue(std::string("odom")));
+		declare_parameter("robot_base_frame", rclcpp::ParameterValue(std::string("base_link")));
+		declare_parameter("transform_tolerance", rclcpp::ParameterValue(0.2));
 
 		declare_parameter("use_stamped_vel", rclcpp::ParameterValue(true));
 	}

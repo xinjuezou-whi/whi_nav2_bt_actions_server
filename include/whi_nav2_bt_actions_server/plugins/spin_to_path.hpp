@@ -37,18 +37,18 @@ namespace whi_nav2_bt_actions_server
 		Status onCycleUpdate() override;
 
 	protected:
-		bool isCollisionFree(const double& RelativeYaw,
-			const geometry_msgs::msg::Twist& CmdVel, geometry_msgs::msg::Pose2D& Pose2d);
+		bool isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,
+			geometry_msgs::msg::Pose2D& Pose2d);
 
-		SpinToPathAction::Feedback::SharedPtr feedback_;
+		SpinToPathAction::Feedback::SharedPtr feedback_{ nullptr };
 
-		double min_rotational_vel_;
-		double max_rotational_vel_;
-		double rotational_acc_lim_;
-		double cmd_yaw_;
-		double prev_yaw_;
-		double relative_yaw_;
-		double simulate_ahead_time_;
+		double min_rotational_vel_{ 0.1 };
+		double max_rotational_vel_{ 1.0 };
+		double rotational_acc_lim_{ 1.57 };
+		double cmd_yaw_{ 0.0 };
+		double prev_yaw_{ 0.0 };
+		double relative_yaw_{ 0.0 };
+		double simulate_ahead_time_{ 2.0 };
 	};
 
 } // namespace whi_nav2_bt_actions_server

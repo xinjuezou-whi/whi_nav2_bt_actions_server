@@ -255,8 +255,8 @@ namespace whi_nav2_bt_actions_server
 
         double cycle_frequency_;
         double enabled_;
-        std::string global_frame_;
-        std::string robot_base_frame_;
+        std::string global_frame_{ "odom" };
+        std::string robot_base_frame_{ "base_link" };
         double transform_tolerance_;
 
         // Clock
