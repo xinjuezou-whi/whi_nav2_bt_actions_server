@@ -17,7 +17,7 @@ Changelog:
 #pragma once
 #include "whi_interfaces/action/spin_to_path.hpp"
 
-#include <geometry_msgs/msg/twist.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <tf2_ros/buffer.h>
 #include <nav2_costmap_2d/costmap_topic_collision_checker.hpp>
@@ -36,9 +36,9 @@ namespace whi_nav2_bt_actions_server
         virtual ~BaseAction() = default;
 
     public:
-        virtual void configure(const rclcpp_lifecycle::LifecycleNode::SharedPtr parent,
-            const std::string & name, std::shared_ptr<tf2_ros::Buffer> tf,
-            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> collision_checker) = 0;
+        virtual void configure(const rclcpp_lifecycle::LifecycleNode::SharedPtr Parent,
+            const std::string& Name, std::shared_ptr<tf2_ros::Buffer> Tf,
+            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> CollisionChecker) = 0;
         virtual void cleanup() = 0;
         virtual void activate() = 0;
         virtual void deactivate() = 0;
@@ -82,15 +82,15 @@ namespace whi_nav2_bt_actions_server
         // if they chose
         virtual void onCleanup() {}
 
-        void configure(const rclcpp_lifecycle::LifecycleNode::SharedPtr parent,
-            const std::string& name, std::shared_ptr<tf2_ros::Buffer> tf,
-            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> collision_checker)
+        void configure(const rclcpp_lifecycle::LifecycleNode::SharedPtr Parent,
+            const std::string& Name, std::shared_ptr<tf2_ros::Buffer> Tf,
+            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> CollisionChecker)
         {
-            RCLCPP_INFO(parent->get_logger(), "Configuring %s", name.c_str());
+            RCLCPP_INFO(Parent->get_logger(), "Configuring %s", Name.c_str());
 
-            node_ = parent;
-            action_name_ = name;
-            tf_ = tf;
+            node_ = Parent;
+            action_name_ = Name;
+            tf_ = Tf;
 
             node_->get_parameter("cycle_frequency", cycle_frequency_);
             node_->get_parameter("global_frame", global_frame_);
@@ -100,9 +100,18 @@ namespace whi_nav2_bt_actions_server
             action_server_ = std::make_shared<ActionServer>(node_, action_name_,
                 std::bind(&BaseActionT::execute, this));
 
-            collision_checker_ = collision_checker;
+            collision_checker_ = CollisionChecker;
 
-            vel_pub_ = node_->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
+            bool useStamped;
+            node_->get_parameter("use_stamped_vel", useStamped);
+            if (useStamped)
+            {
+                vel_pub_ = node_->create_publisher<Twist>("cmd_vel", 1);
+            }
+            else
+            {
+                vel_unstamped_pub_ = node_->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
+            }
 
             onConfigure();
         }
@@ -111,6 +120,7 @@ namespace whi_nav2_bt_actions_server
         {
             action_server_.reset();
             vel_pub_.reset();
+            vel_unstamped_pub_.reset();
             
             onCleanup();
         }
@@ -119,17 +129,32 @@ namespace whi_nav2_bt_actions_server
         {
             RCLCPP_INFO(node_->get_logger(), "Activating %s", action_name_.c_str());
 
-            vel_pub_->on_activate();
+            if (vel_pub_)
+            {
+                vel_pub_->on_activate();
+            }
+            else
+            {
+                vel_unstamped_pub_->on_activate();
+            }
             enabled_ = true;
         }
 
         void deactivate()
         {
-            vel_pub_->on_deactivate();
+            if (vel_pub_)
+            {
+                vel_pub_->on_deactivate();
+            }
+            else
+            {
+                vel_unstamped_pub_->on_deactivate();
+            }
             enabled_ = false;
         }
 
     protected:
+        using Twist = geometry_msgs::msg::TwistStamped;
         void execute()
         {
             RCLCPP_INFO(node_->get_logger(), "Attempting %s", action_name_.c_str());
@@ -204,21 +229,29 @@ namespace whi_nav2_bt_actions_server
 
         void stopRobot()
         {
-            auto cmd_vel = std::make_unique<geometry_msgs::msg::Twist>();
-            cmd_vel->linear.x = 0.0;
-            cmd_vel->linear.y = 0.0;
-            cmd_vel->angular.z = 0.0;
-
-            vel_pub_->publish(std::move(cmd_vel));
+            Twist msgTwist;
+            msgTwist.header.stamp = steady_clock_.now();
+            msgTwist.twist.linear.x = 0.0;
+            msgTwist.twist.linear.y = 0.0;
+            msgTwist.twist.angular.z = 0.0;
+            if (vel_pub_)
+            {
+                vel_pub_->publish(msgTwist);
+            }
+            else
+            {
+                vel_unstamped_pub_->publish(msgTwist.twist);
+            }
         }
 
     protected:
-        rclcpp_lifecycle::LifecycleNode::SharedPtr node_;
+        rclcpp_lifecycle::LifecycleNode::SharedPtr node_{ nullptr };
         std::string action_name_;
-        rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub_;
-        std::shared_ptr<ActionServer> action_server_;
-        std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> collision_checker_;
-        std::shared_ptr<tf2_ros::Buffer> tf_;
+        rclcpp_lifecycle::LifecyclePublisher<Twist>::SharedPtr vel_pub_{ nullptr };
+        rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::Twist>::SharedPtr vel_unstamped_pub_{ nullptr };
+        std::shared_ptr<ActionServer> action_server_{ nullptr };
+        std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> collision_checker_{ nullptr };
+        std::shared_ptr<tf2_ros::Buffer> tf_{ nullptr };
 
         double cycle_frequency_;
         double enabled_;
@@ -227,6 +260,6 @@ namespace whi_nav2_bt_actions_server
         double transform_tolerance_;
 
         // Clock
-        rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
+        rclcpp::Clock steady_clock_{ RCL_STEADY_TIME };
     };
 } // namespace whi_pose_registration_server

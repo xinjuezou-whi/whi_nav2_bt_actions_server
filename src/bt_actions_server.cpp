@@ -25,15 +25,13 @@ Changelog:
 #include <string>
 #include <utility>
 
-using namespace std::chrono_literals;
-
 namespace whi_nav2_bt_actions_server
 {
 	BtActionsServer::BtActionsServer()
-		: LifecycleNode("recoveries_server", "", true)
-		, plugin_loader_("nav2_core", "whi_nav2_bt_actions_server::BaseAction")
-		, default_ids_{"spin_to_path"}
-		, default_types_{"SpinToPath"}
+		: LifecycleNode("whi_nav2_bt_actions_server", "", true)
+		, plugin_loader_("whi_nav2_bt_actions_server", "whi_nav2_bt_actions_server::BaseAction")
+		, default_ids_{"SpinToPath"}
+		, default_types_{"whi_nav2_bt_actions_server::SpinToPath"}
 	{
 		declare_parameter("costmap_topic",
 			rclcpp::ParameterValue(std::string("local_costmap/costmap_raw")));
@@ -47,6 +45,8 @@ namespace whi_nav2_bt_actions_server
 		declare_parameter("robot_base_frame",
 			rclcpp::ParameterValue(std::string("base_link")));
 		declare_parameter("transform_tolerance", rclcpp::ParameterValue(0.1));
+
+		declare_parameter("use_stamped_vel", rclcpp::ParameterValue(true));
 	}
 
 	BtActionsServer::~BtActionsServer()
@@ -64,21 +64,21 @@ namespace whi_nav2_bt_actions_server
 		tf_->setCreateTimerInterface(timer_interface);
 		transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_);
 
-		std::string costmap_topic, footprint_topic;
-		this->get_parameter("costmap_topic", costmap_topic);
-		this->get_parameter("footprint_topic", footprint_topic);
+		std::string topicCostmap, topicFootprint;
+		this->get_parameter("costmap_topic", topicCostmap);
+		this->get_parameter("footprint_topic", topicFootprint);
 		this->get_parameter("transform_tolerance", transform_tolerance_);
 		costmap_sub_ = std::make_unique<nav2_costmap_2d::CostmapSubscriber>(
-			shared_from_this(), costmap_topic);
+			shared_from_this(), topicCostmap);
 		footprint_sub_ = std::make_unique<nav2_costmap_2d::FootprintSubscriber>(
-			shared_from_this(), footprint_topic, 1.0);
+			shared_from_this(), topicFootprint, 1.0);
 
-		std::string global_frame, robot_base_frame;
-		get_parameter("global_frame", global_frame);
-		get_parameter("robot_base_frame", robot_base_frame);
+		std::string frameGlobal, frameRobotBase;
+		get_parameter("global_frame", frameGlobal);
+		get_parameter("robot_base_frame", frameRobotBase);
 		collision_checker_ = std::make_shared<nav2_costmap_2d::CostmapTopicCollisionChecker>(
 			*costmap_sub_, *footprint_sub_, *tf_, this->get_name(),
-			global_frame, robot_base_frame, transform_tolerance_);
+			frameGlobal, frameRobotBase, transform_tolerance_);
 
 		get_parameter("action_plugins", action_ids_);
 		if (action_ids_ == default_ids_)
@@ -103,8 +103,7 @@ namespace whi_nav2_bt_actions_server
 			action_types_[i] = nav2_util::get_plugin_type_param(node, action_ids_[i]);
 			try
 			{
-				RCLCPP_INFO(
-					get_logger(), "Creating recovery plugin %s of type %s",
+				RCLCPP_INFO(get_logger(), "Creating recovery plugin %s of type %s",
 					action_ids_[i].c_str(), action_types_[i].c_str());
 				actions_.push_back(plugin_loader_.createUniqueInstance(action_types_[i]));
 				actions_.back()->configure(node, action_ids_[i], tf_, collision_checker_);
@@ -122,6 +121,7 @@ namespace whi_nav2_bt_actions_server
 	nav2_util::CallbackReturn BtActionsServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
 	{
 		RCLCPP_INFO(get_logger(), "Activating");
+
 		for (auto& it : actions_)
 		{
 			it->activate();
@@ -164,6 +164,7 @@ namespace whi_nav2_bt_actions_server
 	nav2_util::CallbackReturn BtActionsServer::on_shutdown(const rclcpp_lifecycle::State &)
 	{
 		RCLCPP_INFO(get_logger(), "Shutting down");
+
 		return nav2_util::CallbackReturn::SUCCESS;
 	}
 } // namespace whi_nav2_bt_actions_server

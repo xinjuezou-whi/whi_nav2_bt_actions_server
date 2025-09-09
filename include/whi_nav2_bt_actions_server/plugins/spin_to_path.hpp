@@ -31,15 +31,14 @@ namespace whi_nav2_bt_actions_server
 		SpinToPath();
 		~SpinToPath();
 
+	public:
 		Status onRun(const std::shared_ptr<const SpinToPathAction::Goal> Command) override;
 		void onConfigure() override;
 		Status onCycleUpdate() override;
 
 	protected:
-		bool isCollisionFree(
-			const double &distance,
-			geometry_msgs::msg::Twist *cmd_vel,
-			geometry_msgs::msg::Pose2D &pose2d);
+		bool isCollisionFree(const double& RelativeYaw,
+			const geometry_msgs::msg::Twist& CmdVel, geometry_msgs::msg::Pose2D& Pose2d);
 
 		SpinToPathAction::Feedback::SharedPtr feedback_;
 
