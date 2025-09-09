@@ -31,7 +31,7 @@ namespace whi_nav2_bt_actions_server
 		: LifecycleNode("whi_nav2_bt_actions_server", "", true)
 		, plugin_loader_("whi_nav2_bt_actions_server", "whi_nav2_bt_actions_server::BaseAction")
 		, default_ids_{"SpinToPath"}
-		, default_types_{"whi_nav2_bt_actions_server::SpinToPath"}
+		, default_types_{"whi_nav2_bt_actions_server/SpinToPath"}
 	{
 		declare_parameter("costmap_topic",
 			rclcpp::ParameterValue(std::string("local_costmap/costmap_raw")));
@@ -89,6 +89,8 @@ namespace whi_nav2_bt_actions_server
 		action_types_.resize(action_ids_.size());
 		loadActionPlugins();
 
+		RCLCPP_INFO(get_logger(), "\033[1;32mWHI nav2 bt actions server is configured successfully\033[0m");
+
 		return nav2_util::CallbackReturn::SUCCESS;
 	}
 
@@ -101,14 +103,15 @@ namespace whi_nav2_bt_actions_server
 			action_types_[i] = nav2_util::get_plugin_type_param(node, action_ids_[i]);
 			try
 			{
-				RCLCPP_INFO(get_logger(), "Creating recovery plugin %s of type %s",
+				RCLCPP_INFO(get_logger(), "Creating action plugin %s of type %s",
 					action_ids_[i].c_str(), action_types_[i].c_str());
+
 				actions_.push_back(plugin_loader_.createUniqueInstance(action_types_[i]));
 				actions_.back()->configure(node, action_ids_[i], tf_, collision_checker_);
 			}
 			catch (const pluginlib::PluginlibException & ex)
 			{
-				RCLCPP_FATAL(get_logger(), "Failed to create recovery %s of type %s."
+				RCLCPP_FATAL(get_logger(), "Failed to create action %s of type %s."
 					" Exception: %s", action_ids_[i].c_str(), action_types_[i].c_str(),
 					ex.what());
 				exit(-1);
@@ -116,7 +119,7 @@ namespace whi_nav2_bt_actions_server
 		}
 	}
 
-	nav2_util::CallbackReturn BtActionsServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
+	nav2_util::CallbackReturn BtActionsServer::on_activate(const rclcpp_lifecycle::State& /*state*/)
 	{
 		RCLCPP_INFO(get_logger(), "Activating");
 
@@ -128,7 +131,7 @@ namespace whi_nav2_bt_actions_server
 		return nav2_util::CallbackReturn::SUCCESS;
 	}
 
-	nav2_util::CallbackReturn BtActionsServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
+	nav2_util::CallbackReturn BtActionsServer::on_deactivate(const rclcpp_lifecycle::State& /*state*/)
 	{
 		RCLCPP_INFO(get_logger(), "Deactivating");
 
@@ -140,7 +143,7 @@ namespace whi_nav2_bt_actions_server
 		return nav2_util::CallbackReturn::SUCCESS;
 	}
 
-	nav2_util::CallbackReturn BtActionsServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
+	nav2_util::CallbackReturn BtActionsServer::on_cleanup(const rclcpp_lifecycle::State& /*state*/)
 	{
 		RCLCPP_INFO(get_logger(), "Cleaning up");
 
@@ -159,7 +162,7 @@ namespace whi_nav2_bt_actions_server
 		return nav2_util::CallbackReturn::SUCCESS;
 	}
 
-	nav2_util::CallbackReturn BtActionsServer::on_shutdown(const rclcpp_lifecycle::State &)
+	nav2_util::CallbackReturn BtActionsServer::on_shutdown(const rclcpp_lifecycle::State& /*state*/)
 	{
 		RCLCPP_INFO(get_logger(), "Shutting down");
 

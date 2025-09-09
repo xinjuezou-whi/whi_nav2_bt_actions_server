@@ -1,8 +1,8 @@
 <class_libraries>
 	<library path="spin_to_path">
-	  <class name="whi_nav2_bt_actions_server/SpinToPath"
-           type="whi_nav2_bt_actions_server::SpinToPath"
-           base_class_type="whi_nav2_bt_actions_server::BaseAction">
+	  <class name="whi_nav2_bt_actions_server::SpinToPath"
+             type="whi_nav2_bt_actions_server::SpinToPath"
+             base_class_type="whi_nav2_bt_actions_server::BaseAction">
 	    <description>Spin to align with the planned path</description>
 	  </class>
 	</library>

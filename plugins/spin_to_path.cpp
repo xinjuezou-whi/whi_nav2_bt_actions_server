@@ -21,10 +21,9 @@ namespace whi_nav2_bt_actions_server
 	SpinToPath::SpinToPath()
 		: BaseActionT<SpinToPathAction>()
 		, feedback_(std::make_shared<SpinToPathAction::Feedback>())
-		, prev_yaw_(0.0)
 	{
 		/// node version and copyright announcement
-		std::cout << "\nWHI bt action spin to path VERSION 00.00.2" << std::endl;
+		std::cout << "\nWHI bt action spin to path VERSION 00.00.3" << std::endl;
 		std::cout << "Copyright © 2025-2026 Wheel Hub Intelligent Co.,Ltd. All rights reserved\n" << std::endl;
 	}
 
@@ -72,7 +71,7 @@ namespace whi_nav2_bt_actions_server
 		}
 		cmd_yaw_ = tf2::getYaw(currentPose.pose.orientation) - tf2::getYaw(it->pose.orientation);
 
-		RCLCPP_INFO(node_->get_logger(), "Turning %0.2f for spin recovery.", cmd_yaw_);
+		RCLCPP_INFO(node_->get_logger(), "Turning %0.2f for align with path.", cmd_yaw_);
 
 		return Status::SUCCEEDED;
 	}

@@ -99,10 +99,11 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_include_directories(include)
-ament_export_libraries(simple_progress_checker
-  simple_goal_checker
-  stopped_goal_checker
-  ${library_name})
-pluginlib_export_plugin_description_file(nav2_core plugins.xml)
+ament_export_libraries(
+  spin_to_path
+  ${library_name}
+)
+
+pluginlib_export_plugin_description_file(whi_nav2_bt_actions_server plugins.xml)
 
 ament_package()
