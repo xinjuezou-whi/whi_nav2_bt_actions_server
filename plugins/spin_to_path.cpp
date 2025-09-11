@@ -15,6 +15,8 @@ All text above must be included in any redistribution.
 
 #include <nav2_util/node_utils.hpp>
 #include <nav2_util/geometry_utils.hpp>
+#include <angles/angles.h>
+#include <geometry_msgs/msg/point.hpp>
 
 namespace whi_nav2_bt_actions_server
 {
@@ -23,7 +25,7 @@ namespace whi_nav2_bt_actions_server
 		, feedback_(std::make_shared<SpinToPathAction::Feedback>())
 	{
 		/// node version and copyright announcement
-		std::cout << "\nWHI bt action spin to path VERSION 00.00.3" << std::endl;
+		std::cout << "\nWHI bt action spin to path VERSION 00.00.4" << std::endl;
 		std::cout << "Copyright © 2025-2026 Wheel Hub Intelligent Co.,Ltd. All rights reserved\n" << std::endl;
 	}
 
@@ -44,6 +46,58 @@ namespace whi_nav2_bt_actions_server
 		node_->get_parameter(action_name_ + ".rotational_acc_lim", rotational_acc_lim_);
 	}
 
+    static double angleBetweenVectors2D(const geometry_msgs::msg::Point& From,
+		const geometry_msgs::msg::Point& To)
+	{
+        double dot = From.x * To.x + From.y * To.y;
+        double det = From.x * To.y - From.y * To.x;
+
+        return atan2(det, dot);
+	}
+
+	bool transformTo(const geometry_msgs::msg::PoseStamped& SrcPose,
+		geometry_msgs::msg::PoseStamped& DstPose,
+		const std::string& SrcFrame, const std::string& DstFrame,
+		tf2_ros::Buffer& TfBuffer, const double TransformTimeout)
+	{
+		static rclcpp::Logger logger = rclcpp::get_logger("transformTo");
+		
+		geometry_msgs::msg::PoseStamped src = SrcPose;
+		src.header.frame_id = SrcFrame;
+		src.header.stamp = rclcpp::Time();
+
+		try
+		{
+			DstPose = TfBuffer.transform(src, DstFrame, tf2::durationFromSec(TransformTimeout));
+
+			return true;
+		}
+		catch (tf2::LookupException& ex)
+		{
+			RCLCPP_ERROR(logger, "No Transform available Error looking up robot pose: %s\n",
+				ex.what());
+		}
+		catch (tf2::ConnectivityException& ex)
+		{
+			RCLCPP_ERROR(logger, "Connectivity Error looking up robot pose: %s\n", ex.what());
+		}
+		catch (tf2::ExtrapolationException& ex)
+		{
+			RCLCPP_ERROR(logger, "Extrapolation Error looking up robot pose: %s\n", ex.what());
+		}
+		catch (tf2::TimeoutException& ex)
+		{
+			RCLCPP_ERROR(logger, "Transform timeout with tolerance: %.4f", TransformTimeout);
+		}
+		catch (tf2::TransformException& ex)
+		{
+			RCLCPP_ERROR(logger, "Failed to transform from %s to %s",
+				SrcFrame.c_str(), DstFrame.c_str());
+		}
+
+		return false;
+	}
+
 	Status SpinToPath::onRun(const std::shared_ptr<const SpinToPathAction::Goal> Command)
 	{
 		geometry_msgs::msg::PoseStamped currentPose;
@@ -56,20 +110,51 @@ namespace whi_nav2_bt_actions_server
 		prev_yaw_ = tf2::getYaw(currentPose.pose.orientation);
 		relative_yaw_ = 0.0;
 
+		double lookahead = 0.3;
 		auto it = Command->path.poses.begin();
 		for (it = Command->path.poses.begin() + 1; it != Command->path.poses.end(); ++it)
 		{
-			if (nav2_util::geometry_utils::euclidean_distance(Command->path.poses.front().pose, it->pose) >
-				Command->lookahead_distance)
+			lookahead = nav2_util::geometry_utils::euclidean_distance(Command->path.poses.front().pose, it->pose);
+			if (lookahead > Command->lookahead_distance)
 			{
 				break;
 			}
 		}
-		if (it == Command->path.poses.end())
+
+		geometry_msgs::msg::PoseStamped posePathEnd;
+		if (it == Command->path.poses.end() || lookahead < Command->lookahead_distance)
 		{
-			it = Command->path.poses.end() - 1;
+			posePathEnd = *(Command->path.poses.end() - 1);
 		}
-		cmd_yaw_ = tf2::getYaw(currentPose.pose.orientation) - tf2::getYaw(it->pose.orientation);
+		else
+		{
+			posePathEnd = *it;
+		}
+		// posePathEnd.header.frame_id = "map";
+		// posePathEnd.header.stamp = rclcpp::Time();
+		geometry_msgs::msg::PoseStamped poseEndOnRobotFrame;
+		// poseEndOnRobotFrame = tf_->transform(posePathEnd, robot_base_frame_,
+		// 	tf2::durationFromSec(transform_tolerance_));
+		transformTo(posePathEnd, poseEndOnRobotFrame, "map", robot_base_frame_,
+			*tf_, transform_tolerance_);
+
+		if (lookahead > Command->lookahead_distance)
+		{
+			// use the angle between vectors to calculate the angular distance
+			geometry_msgs::msg::Point vecPath;
+			vecPath.x = poseEndOnRobotFrame.pose.position.x;
+			vecPath.y = poseEndOnRobotFrame.pose.position.y;
+
+			geometry_msgs::msg::Point vecCurrent;
+			vecCurrent.x = 1.0;
+			vecCurrent.y = 0.0;
+			cmd_yaw_ =  angleBetweenVectors2D(vecCurrent, vecPath);
+		}
+		else
+		{
+			// use the orientation of path to calculate the angular distance
+			cmd_yaw_ = tf2::getYaw(poseEndOnRobotFrame.pose.orientation);
+		}
 
 		RCLCPP_INFO(node_->get_logger(), "Turning %0.2f for align with path.", cmd_yaw_);
 
