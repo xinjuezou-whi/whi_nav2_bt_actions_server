@@ -30,11 +30,13 @@ namespace whi_nav2_bt_actions_server
 	class BtActionsServer : public nav2_util::LifecycleNode
 	{
 	public:
-		BtActionsServer();
+		BtActionsServer(const rclcpp::NodeOptions& Options = rclcpp::NodeOptions());
 		~BtActionsServer();
 
 	public:
-		void loadActionPlugins();
+		bool loadActionPlugins();
+		void setupResourcesForBehaviorPlugins();
+		void configureBehaviorPlugins();
 
 	protected:
 		nav2_util::CallbackReturn on_configure(const rclcpp_lifecycle::State& State) override;
@@ -56,9 +58,12 @@ namespace whi_nav2_bt_actions_server
 		std::vector<std::string> action_types_;
 
 		// Utilities
-		std::unique_ptr<nav2_costmap_2d::CostmapSubscriber> costmap_sub_;
-		std::unique_ptr<nav2_costmap_2d::FootprintSubscriber> footprint_sub_;
-		std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> collision_checker_;
+		std::unique_ptr<nav2_costmap_2d::CostmapSubscriber> local_costmap_sub_;
+		std::unique_ptr<nav2_costmap_2d::FootprintSubscriber> local_footprint_sub_;
+		std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> local_collision_checker_;
+		std::unique_ptr<nav2_costmap_2d::CostmapSubscriber> global_costmap_sub_;
+		std::unique_ptr<nav2_costmap_2d::FootprintSubscriber> global_footprint_sub_;
+		std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> global_collision_checker_;
 
 		double transform_tolerance_;
 	};

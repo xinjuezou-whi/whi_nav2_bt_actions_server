@@ -15,6 +15,7 @@ All text above must be included in any redistribution.
 
 #include <nav2_util/node_utils.hpp>
 #include <nav2_util/geometry_utils.hpp>
+#include <tf2/utils.hpp>
 #include <angles/angles.h>
 #include <geometry_msgs/msg/point.hpp>
 
@@ -33,17 +34,23 @@ namespace whi_nav2_bt_actions_server
 
 	void SpinToPath::onConfigure()
 	{
-		nav2_util::declare_parameter_if_not_declared(node_, action_name_ + ".simulate_ahead_time", rclcpp::ParameterValue(2.0));
-		node_->get_parameter(action_name_ + ".simulate_ahead_time", simulate_ahead_time_);
+		auto node = node_.lock();
+		if (!node)
+		{
+			throw std::runtime_error{"Failed to lock node"};
+		}
 
-		nav2_util::declare_parameter_if_not_declared(node_, action_name_ + ".min_rotational_vel", rclcpp::ParameterValue(0.1));
-		node_->get_parameter(action_name_ + ".min_rotational_vel", min_rotational_vel_);
+		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".simulate_ahead_time", rclcpp::ParameterValue(2.0));
+		node->get_parameter(action_name_ + ".simulate_ahead_time", simulate_ahead_time_);
 
-		nav2_util::declare_parameter_if_not_declared(node_, action_name_ + ".max_rotational_vel", rclcpp::ParameterValue(1.0));
-		node_->get_parameter(action_name_ + ".max_rotational_vel", max_rotational_vel_);
+		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".min_rotational_vel", rclcpp::ParameterValue(0.1));
+		node->get_parameter(action_name_ + ".min_rotational_vel", min_rotational_vel_);
 
-		nav2_util::declare_parameter_if_not_declared(node_, action_name_ + ".rotational_acc_lim", rclcpp::ParameterValue(1.57));
-		node_->get_parameter(action_name_ + ".rotational_acc_lim", rotational_acc_lim_);
+		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".max_rotational_vel", rclcpp::ParameterValue(1.0));
+		node->get_parameter(action_name_ + ".max_rotational_vel", max_rotational_vel_);
+
+		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".rotational_acc_lim", rclcpp::ParameterValue(1.57));
+		node->get_parameter(action_name_ + ".rotational_acc_lim", rotational_acc_lim_);
 	}
 
     static double angleBetweenVectors2D(const geometry_msgs::msg::Point& From,
@@ -98,13 +105,16 @@ namespace whi_nav2_bt_actions_server
 		return false;
 	}
 
-	Status SpinToPath::onRun(const std::shared_ptr<const SpinToPathAction::Goal> Command)
+	ResultStatus SpinToPath::onRun(const std::shared_ptr<const SpinToPathAction::Goal> Command)
 	{
 		geometry_msgs::msg::PoseStamped currentPose;
-		if (!nav2_util::getCurrentPose(currentPose, *tf_, global_frame_, robot_base_frame_, transform_tolerance_))
+		if (!nav2_util::getCurrentPose(currentPose, *tf_, global_frame_, robot_base_frame_,
+			transform_tolerance_))
 		{
-			RCLCPP_ERROR(node_->get_logger(), "Current robot pose is not available.");
-			return Status::FAILED;
+			std::string errorMsg("Current robot pose is not available.");
+			RCLCPP_ERROR(logger_, errorMsg.c_str());
+
+			return ResultStatus{Status::FAILED, SpinToPathResult::TF_ERROR, errorMsg};
 		}
 
 		prev_yaw_ = tf2::getYaw(currentPose.pose.orientation);
@@ -130,11 +140,7 @@ namespace whi_nav2_bt_actions_server
 		{
 			posePathEnd = *it;
 		}
-		// posePathEnd.header.frame_id = "map";
-		// posePathEnd.header.stamp = rclcpp::Time();
 		geometry_msgs::msg::PoseStamped poseEndOnRobotFrame;
-		// poseEndOnRobotFrame = tf_->transform(posePathEnd, robot_base_frame_,
-		// 	tf2::durationFromSec(transform_tolerance_));
 		transformTo(posePathEnd, poseEndOnRobotFrame, "map", robot_base_frame_,
 			*tf_, transform_tolerance_);
 
@@ -156,30 +162,32 @@ namespace whi_nav2_bt_actions_server
 			cmd_yaw_ = tf2::getYaw(poseEndOnRobotFrame.pose.orientation);
 		}
 
-		RCLCPP_INFO(node_->get_logger(), "Turning %0.2f for align with path.", cmd_yaw_);
+		RCLCPP_INFO(logger_, "Turning %0.2f for align with path.", cmd_yaw_);
 
-		return Status::SUCCEEDED;
+		return ResultStatus{Status::SUCCEEDED, SpinToPathResult::NONE, ""};
 	}
 
-	Status SpinToPath::onCycleUpdate()
+	ResultStatus SpinToPath::onCycleUpdate()
 	{
 		geometry_msgs::msg::PoseStamped currentPose;
-		if (!nav2_util::getCurrentPose(currentPose, *tf_, global_frame_, robot_base_frame_, transform_tolerance_))
+		if (!nav2_util::getCurrentPose(currentPose, *tf_, global_frame_, robot_base_frame_,
+			transform_tolerance_))
 		{
-			RCLCPP_ERROR(node_->get_logger(), "Current robot pose is not available.");
-			return Status::FAILED;
+			std::string errorMsg("Current robot pose is not available.");
+			RCLCPP_ERROR(logger_, errorMsg.c_str());
+			return ResultStatus{Status::FAILED, SpinToPathResult::TF_ERROR, errorMsg};
 		}
 
-		const double current_yaw = tf2::getYaw(currentPose.pose.orientation);
+		const double currentYaw = tf2::getYaw(currentPose.pose.orientation);
 
-		double delta_yaw = current_yaw - prev_yaw_;
-		if (abs(delta_yaw) > M_PI)
+		double deltaYaw = currentYaw - prev_yaw_;
+		if (abs(deltaYaw) > M_PI)
 		{
-			delta_yaw = copysign(2 * M_PI - abs(delta_yaw), prev_yaw_);
+			deltaYaw = copysign(2 * M_PI - abs(deltaYaw), prev_yaw_);
 		}
 
-		relative_yaw_ += delta_yaw;
-		prev_yaw_ = current_yaw;
+		relative_yaw_ += deltaYaw;
+		prev_yaw_ = currentYaw;
 
 		feedback_->angular_distance_traveled = relative_yaw_;
 		action_server_->publish_feedback(feedback_);
@@ -188,14 +196,14 @@ namespace whi_nav2_bt_actions_server
 		if (remaining_yaw <= 0)
 		{
 			stopRobot();
-			return Status::SUCCEEDED;
+			return ResultStatus{Status::SUCCEEDED, SpinToPathResult::NONE, ""};
 		}
 
 		double vel = sqrt(2 * rotational_acc_lim_ * remaining_yaw);
 		vel = std::min(std::max(vel, min_rotational_vel_), max_rotational_vel_);
 
 		Twist msgTwist;
-		msgTwist.header.stamp = steady_clock_.now();
+		msgTwist.header.stamp = clock_->now();
 		msgTwist.twist.angular.z = copysign(vel, cmd_yaw_);
 
 		geometry_msgs::msg::Pose2D pose2d;
@@ -206,8 +214,9 @@ namespace whi_nav2_bt_actions_server
 		if (!isCollisionFree(relative_yaw_, msgTwist.twist, pose2d))
 		{
 			stopRobot();
-			RCLCPP_WARN(node_->get_logger(), "Collision Ahead - Exiting Spin");
-			return Status::SUCCEEDED;
+			std::string errorMsg("Collision Ahead - Exiting Spin");
+			RCLCPP_WARN(logger_, errorMsg.c_str());
+			return ResultStatus{Status::FAILED, SpinToPathResult::COLLISION_AHEAD, errorMsg};
 		}
 
 		if (vel_pub_)
@@ -219,32 +228,35 @@ namespace whi_nav2_bt_actions_server
 			vel_unstamped_pub_->publish(msgTwist.twist);
 		}
 
-		return Status::RUNNING;
+		return ResultStatus{Status::RUNNING, SpinToPathResult::NONE, ""};
 	}
 
 	bool SpinToPath::isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,
 		geometry_msgs::msg::Pose2D& Pose2d)
 	{
 		// Simulate ahead by simulate_ahead_time_ in cycle_frequency_ increments
-		int cycle_count = 0;
-		double sim_position_change;
-		const int max_cycle_count = static_cast<int>(cycle_frequency_ * simulate_ahead_time_);
+		int cycleCount = 0;
+		double simPositionChange;
+		const int maxCycleCount = static_cast<int>(cycle_frequency_ * simulate_ahead_time_);
+		geometry_msgs::msg::Pose2D initPose = Pose2d;
+		bool fetchData = true;
 
-		while (cycle_count < max_cycle_count)
+		while (cycleCount < maxCycleCount)
 		{
-			sim_position_change = CmdVel.angular.z * (cycle_count / cycle_frequency_);
-			Pose2d.theta += sim_position_change;
-			cycle_count++;
+			simPositionChange = CmdVel.angular.z * (cycleCount / cycle_frequency_);
+			Pose2d.theta = initPose.theta + simPositionChange;
+			cycleCount++;
 
-			if (abs(RelativeYaw) - abs(sim_position_change) <= 0.)
+			if (abs(RelativeYaw) - abs(simPositionChange) <= 0.)
 			{
 				break;
 			}
 
-			if (!collision_checker_->isCollisionFree(Pose2d))
+			if (!local_collision_checker_->isCollisionFree(Pose2d, fetchData))
 			{
 				return false;
 			}
+			fetchData = false;
 		}
 		return true;
 	}

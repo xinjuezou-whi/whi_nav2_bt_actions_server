@@ -27,6 +27,14 @@ Changelog:
 
 namespace whi_nav2_bt_actions_server
 {
+    enum class CostmapInfoType
+    {
+        NONE = 0,
+        LOCAL = 1,
+        GLOBAL = 2,
+        BOTH = 3
+    };
+
     class BaseAction
     {
     public:
@@ -38,10 +46,12 @@ namespace whi_nav2_bt_actions_server
     public:
         virtual void configure(const rclcpp_lifecycle::LifecycleNode::SharedPtr Parent,
             const std::string& Name, std::shared_ptr<tf2_ros::Buffer> Tf,
-            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> CollisionChecker) = 0;
+            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> LocalCollisionChecker,
+            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> GlobalCollisionChecker) = 0;
         virtual void cleanup() = 0;
         virtual void activate() = 0;
         virtual void deactivate() = 0;
+        virtual CostmapInfoType getResourceInfo() = 0;
     };
 
     enum class Status : int8_t
@@ -51,11 +61,18 @@ namespace whi_nav2_bt_actions_server
         RUNNING = 3,
     };
 
+    struct ResultStatus
+    {
+        Status status;
+        uint16_t error_code{0};
+        std::string error_msg;
+    };
+
     template<typename ActionT>
     class BaseActionT : public BaseAction
     {
     public:
-        using ActionServer = nav2_util::SimpleActionServer<ActionT, rclcpp_lifecycle::LifecycleNode>;
+        using ActionServer = nav2_util::SimpleActionServer<ActionT>;
 
         BaseActionT()
             : action_server_(nullptr), cycle_frequency_(10.0), enabled_(false) {};
@@ -65,14 +82,14 @@ namespace whi_nav2_bt_actions_server
         // Derived classes can override this method to catch the command and perform some checks
         // before getting into the main loop. The method will only be called
         // once and should return SUCCEEDED otherwise behavior will return FAILED.
-        virtual Status onRun(const std::shared_ptr<const typename ActionT::Goal> Command) = 0;
+        virtual ResultStatus onRun(const std::shared_ptr<const typename ActionT::Goal> Command) = 0;
 
         // This is the method derived classes should mainly implement
         // and will be called cyclically while it returns RUNNING.
         // Implement the behavior such that it runs some unit of work on each call
         // and provides a status. The recovery will finish once SUCCEEDED is returned
         // It's up to the derived class to define the final commanded velocity.
-        virtual Status onCycleUpdate() = 0;
+        virtual ResultStatus onCycleUpdate() = 0;
 
         // an opportunity for derived classes to do something on configuration
         // if they chose
@@ -82,41 +99,64 @@ namespace whi_nav2_bt_actions_server
         // if they chose
         virtual void onCleanup() {}
 
+        // an opportunity for a derived class to do something on action completion
+        virtual void onActionCompletion(std::shared_ptr<typename ActionT::Result>/*result*/) {}
+
         void configure(const rclcpp_lifecycle::LifecycleNode::SharedPtr Parent,
             const std::string& Name, std::shared_ptr<tf2_ros::Buffer> Tf,
-            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> CollisionChecker)
+            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> LocalCollisionChecker,
+            std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> GlobalCollisionChecker) override
         {
             RCLCPP_INFO(Parent->get_logger(), "Configuring %s", Name.c_str());
 
             node_ = Parent;
+            auto node = node_.lock();
+            logger_ = node->get_logger();
+            clock_ = node->get_clock();
+
+            RCLCPP_INFO(logger_, "Configuring %s", Name.c_str());
+
             action_name_ = Name;
             tf_ = Tf;
 
-            node_->get_parameter("cycle_frequency", cycle_frequency_);
-            node_->get_parameter("global_frame", global_frame_);
-            node_->get_parameter("robot_base_frame", robot_base_frame_);
-            node_->get_parameter("transform_tolerance", transform_tolerance_);
+            node->get_parameter("cycle_frequency", cycle_frequency_);
+            node->get_parameter("local_frame", local_frame_);
+            node->get_parameter("global_frame", global_frame_);
+            node->get_parameter("robot_base_frame", robot_base_frame_);
+            node->get_parameter("transform_tolerance", transform_tolerance_);
 
-            action_server_ = std::make_shared<ActionServer>(node_, action_name_,
-                std::bind(&BaseActionT::execute, this));
+            if (!node->has_parameter("action_server_result_timeout"))
+            {
+                node->declare_parameter("action_server_result_timeout", 10.0);
+            }
 
-            collision_checker_ = CollisionChecker;
+            double actionServerResultTimeout;
+            node->get_parameter("action_server_result_timeout", actionServerResultTimeout);
+            rcl_action_server_options_t serverOptions = rcl_action_server_get_default_options();
+            serverOptions.result_timeout.nanoseconds = RCL_S_TO_NS(actionServerResultTimeout);
+
+            action_server_ = std::make_shared<ActionServer>(node, action_name_,
+                std::bind(&BaseActionT::execute, this), nullptr,
+                std::chrono::milliseconds(500), false, serverOptions);
+
+            local_collision_checker_ = LocalCollisionChecker;
+            global_collision_checker_ = GlobalCollisionChecker;
 
             bool useStamped;
-            node_->get_parameter("use_stamped_vel", useStamped);
+            node->get_parameter("use_stamped_vel", useStamped);
             if (useStamped)
             {
-                vel_pub_ = node_->create_publisher<Twist>("cmd_vel", 1);
+                vel_pub_ = node->create_publisher<Twist>("cmd_vel", 1);
             }
             else
             {
-                vel_unstamped_pub_ = node_->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
+                vel_unstamped_pub_ = node->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
             }
 
             onConfigure();
         }
 
-        void cleanup()
+        void cleanup() override
         {
             action_server_.reset();
             vel_pub_.reset();
@@ -125,9 +165,9 @@ namespace whi_nav2_bt_actions_server
             onCleanup();
         }
 
-        void activate()
+        void activate() override
         {
-            RCLCPP_INFO(node_->get_logger(), "Activating %s", action_name_.c_str());
+            RCLCPP_INFO(logger_, "Activating %s", action_name_.c_str());
 
             if (vel_pub_)
             {
@@ -140,7 +180,7 @@ namespace whi_nav2_bt_actions_server
             enabled_ = true;
         }
 
-        void deactivate()
+        void deactivate() override
         {
             if (vel_pub_)
             {
@@ -150,6 +190,7 @@ namespace whi_nav2_bt_actions_server
             {
                 vel_unstamped_pub_->on_deactivate();
             }
+            action_server_->deactivate();
             enabled_ = false;
         }
 
@@ -157,66 +198,75 @@ namespace whi_nav2_bt_actions_server
         using Twist = geometry_msgs::msg::TwistStamped;
         void execute()
         {
-            RCLCPP_INFO(node_->get_logger(), "Attempting %s", action_name_.c_str());
+            RCLCPP_INFO(logger_, "Attempting %s", action_name_.c_str());
 
             if (!enabled_)
             {
-                RCLCPP_WARN(node_->get_logger(), "Called while inactive, ignoring request.");
+                RCLCPP_WARN(logger_, "Called while inactive, ignoring request.");
                 return;
             }
-
-            if (onRun(action_server_->get_current_goal()) != Status::SUCCEEDED)
-            {
-                RCLCPP_INFO(node_->get_logger(), "Initial checks failed for %s", action_name_.c_str());
-                action_server_->terminate_current();
-
-                return;
-            }
-
-            // Log a message every second
-            auto timer = node_->create_wall_timer(std::chrono::seconds(1), [&]()
-                { RCLCPP_INFO(node_->get_logger(), "%s running...", action_name_.c_str()); });
-
-            auto start_time = steady_clock_.now();
 
             // Initialize the ActionT result
             auto result = std::make_shared<typename ActionT::Result>();
 
+            ResultStatus onRunResult = onRun(action_server_->get_current_goal());
+            if (onRunResult.status != Status::SUCCEEDED)
+            {
+                result->error_code = onRunResult.error_code;
+                result->error_msg = onRunResult.error_msg;
+                RCLCPP_INFO(logger_, "Initial checks failed for %s - %s", action_name_.c_str(),
+                    onRunResult.error_msg.c_str());
+                action_server_->terminate_current(result);
+                return;
+            }
+
+            auto startTime = clock_->now();
             rclcpp::Rate loop_rate(cycle_frequency_);
 
             while (rclcpp::ok())
             {
-                if (action_server_->is_cancel_requested())
-                {
-                    RCLCPP_INFO(node_->get_logger(), "Canceling %s", action_name_.c_str());
-                    stopRobot();
-                    result->total_elapsed_time = steady_clock_.now() - start_time;
-                    action_server_->terminate_all(result);
-                    return;
-                }
+                elapsed_time_ = clock_->now() - startTime;
 
                 if (action_server_->is_preempt_requested())
                 {
-                    RCLCPP_ERROR(node_->get_logger(), "Received a preemption request for %s,"
+                    RCLCPP_ERROR(logger_, "Received a preemption request for %s,"
                         " however feature is currently not implemented. Aborting and stopping.",
                         action_name_.c_str());
                     stopRobot();
-                    result->total_elapsed_time = steady_clock_.now() - start_time;
+                    result->total_elapsed_time = clock_->now() - startTime;
+                    onActionCompletion(result);
                     action_server_->terminate_current(result);
 
                     return;
                 }
 
-                switch (onCycleUpdate())
+                if (action_server_->is_cancel_requested())
+                {
+                    RCLCPP_INFO(logger_, "Canceling %s", action_name_.c_str());
+                    stopRobot();
+                    result->total_elapsed_time = elapsed_time_;
+                    onActionCompletion(result);
+                    action_server_->terminate_all(result);
+
+                    return;
+                }
+
+
+                ResultStatus onCycleUpdateResult = onCycleUpdate();
+                switch (onCycleUpdateResult.status)
                 {
                 case Status::SUCCEEDED:
-                    RCLCPP_INFO(node_->get_logger(), "%s completed successfully", action_name_.c_str());
-                    result->total_elapsed_time = steady_clock_.now() - start_time;
+                    RCLCPP_INFO(logger_, "%s completed successfully", action_name_.c_str());
+                    result->total_elapsed_time = clock_->now() - startTime;
+                    onActionCompletion(result);
                     action_server_->succeeded_current(result);
                     return;
                 case Status::FAILED:
-                    RCLCPP_WARN(node_->get_logger(), "%s failed", action_name_.c_str());
-                    result->total_elapsed_time = steady_clock_.now() - start_time;
+                    result->error_code = onCycleUpdateResult.error_code;
+                    result->error_msg = action_name_ + " failed:" + onCycleUpdateResult.error_msg;
+                    RCLCPP_WARN(logger_, result->error_msg.c_str());
+                    result->total_elapsed_time = clock_->now() - startTime;
+                    onActionCompletion(result);
                     action_server_->terminate_current(result);
                     return;
                 case Status::RUNNING:
@@ -230,7 +280,7 @@ namespace whi_nav2_bt_actions_server
         void stopRobot()
         {
             Twist msgTwist;
-            msgTwist.header.stamp = steady_clock_.now();
+            msgTwist.header.stamp = clock_->now();
             msgTwist.twist.linear.x = 0.0;
             msgTwist.twist.linear.y = 0.0;
             msgTwist.twist.angular.z = 0.0;
@@ -245,21 +295,29 @@ namespace whi_nav2_bt_actions_server
         }
 
     protected:
-        rclcpp_lifecycle::LifecycleNode::SharedPtr node_{ nullptr };
+        rclcpp_lifecycle::LifecycleNode::WeakPtr node_;
+
         std::string action_name_;
         rclcpp_lifecycle::LifecyclePublisher<Twist>::SharedPtr vel_pub_{ nullptr };
         rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::Twist>::SharedPtr vel_unstamped_pub_{ nullptr };
         std::shared_ptr<ActionServer> action_server_{ nullptr };
-        std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> collision_checker_{ nullptr };
+        std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> local_collision_checker_{ nullptr };
+        std::shared_ptr<nav2_costmap_2d::CostmapTopicCollisionChecker> global_collision_checker_{ nullptr };
         std::shared_ptr<tf2_ros::Buffer> tf_{ nullptr };
 
         double cycle_frequency_;
         double enabled_;
-        std::string global_frame_{ "odom" };
+        std::string local_frame_{ "odom" };
+        std::string global_frame_{ "map" };
         std::string robot_base_frame_{ "base_link" };
-        double transform_tolerance_;
+        double transform_tolerance_{ 0.25 };
+
+        rclcpp::Duration elapsed_time_{0, 0};
 
         // Clock
-        rclcpp::Clock steady_clock_{ RCL_STEADY_TIME };
+        rclcpp::Clock::SharedPtr clock_;
+
+        // Logger
+        rclcpp::Logger logger_{ rclcpp::get_logger("whi_nav2_bt_actions_server") };
     };
 } // namespace whi_pose_registration_server

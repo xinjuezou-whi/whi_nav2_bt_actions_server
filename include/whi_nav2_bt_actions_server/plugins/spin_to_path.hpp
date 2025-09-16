@@ -28,13 +28,17 @@ namespace whi_nav2_bt_actions_server
 	class SpinToPath : public BaseActionT<SpinToPathAction>
 	{
 	public:
+		using SpinToPathGoal = SpinToPathAction::Goal;
+		using SpinToPathResult = SpinToPathAction::Result;
+
 		SpinToPath();
 		~SpinToPath();
 
 	public:
-		Status onRun(const std::shared_ptr<const SpinToPathAction::Goal> Command) override;
+		ResultStatus onRun(const std::shared_ptr<const SpinToPathGoal> Command) override;
 		void onConfigure() override;
-		Status onCycleUpdate() override;
+		ResultStatus onCycleUpdate() override;
+		CostmapInfoType getResourceInfo() override { return CostmapInfoType::LOCAL; };
 
 	protected:
 		bool isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,
