@@ -16,7 +16,7 @@ Changelog:
 ******************************************************************/
 #pragma once
 #include "whi_interfaces/action/spin_to_path.hpp"
-#include "../base_action.hpp"
+#include "whi_nav2_bt_actions_server/base_action.hpp"
 
 #include <memory>
 #include <string>
@@ -35,10 +35,9 @@ namespace whi_nav2_bt_actions_server
 		~SpinToPath();
 
 	public:
-		ResultStatus onRun(const std::shared_ptr<const SpinToPathGoal> Command) override;
+		Status onRun(const std::shared_ptr<const SpinToPathGoal> Command) override;
 		void onConfigure() override;
-		ResultStatus onCycleUpdate() override;
-		CostmapInfoType getResourceInfo() override { return CostmapInfoType::LOCAL; };
+		Status onCycleUpdate() override;
 
 	protected:
 		bool isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,

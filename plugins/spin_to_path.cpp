@@ -26,7 +26,7 @@ namespace whi_nav2_bt_actions_server
 		, feedback_(std::make_shared<SpinToPathAction::Feedback>())
 	{
 		/// node version and copyright announcement
-		std::cout << "\nWHI bt action spin to path VERSION 00.00.4" << std::endl;
+		std::cout << "\nWHI bt action spin to path VERSION 00.01.1" << std::endl;
 		std::cout << "Copyright © 2025-2026 Wheel Hub Intelligent Co.,Ltd. All rights reserved\n" << std::endl;
 	}
 
@@ -105,7 +105,7 @@ namespace whi_nav2_bt_actions_server
 		return false;
 	}
 
-	ResultStatus SpinToPath::onRun(const std::shared_ptr<const SpinToPathAction::Goal> Command)
+	Status SpinToPath::onRun(const std::shared_ptr<const SpinToPathGoal> Command)
 	{
 		geometry_msgs::msg::PoseStamped currentPose;
 		if (!nav2_util::getCurrentPose(currentPose, *tf_, global_frame_, robot_base_frame_,
@@ -114,7 +114,7 @@ namespace whi_nav2_bt_actions_server
 			std::string errorMsg("Current robot pose is not available.");
 			RCLCPP_ERROR(logger_, errorMsg.c_str());
 
-			return ResultStatus{Status::FAILED, SpinToPathResult::TF_ERROR, errorMsg};
+			return Status::FAILED;
 		}
 
 		prev_yaw_ = tf2::getYaw(currentPose.pose.orientation);
@@ -164,10 +164,10 @@ namespace whi_nav2_bt_actions_server
 
 		RCLCPP_INFO(logger_, "Turning %0.2f for align with path.", cmd_yaw_);
 
-		return ResultStatus{Status::SUCCEEDED, SpinToPathResult::NONE, ""};
+		return Status::SUCCEEDED;
 	}
 
-	ResultStatus SpinToPath::onCycleUpdate()
+	Status SpinToPath::onCycleUpdate()
 	{
 		geometry_msgs::msg::PoseStamped currentPose;
 		if (!nav2_util::getCurrentPose(currentPose, *tf_, global_frame_, robot_base_frame_,
@@ -175,7 +175,7 @@ namespace whi_nav2_bt_actions_server
 		{
 			std::string errorMsg("Current robot pose is not available.");
 			RCLCPP_ERROR(logger_, errorMsg.c_str());
-			return ResultStatus{Status::FAILED, SpinToPathResult::TF_ERROR, errorMsg};
+			return Status::FAILED;
 		}
 
 		const double currentYaw = tf2::getYaw(currentPose.pose.orientation);
@@ -196,7 +196,7 @@ namespace whi_nav2_bt_actions_server
 		if (remaining_yaw <= 0)
 		{
 			stopRobot();
-			return ResultStatus{Status::SUCCEEDED, SpinToPathResult::NONE, ""};
+			return Status::SUCCEEDED;
 		}
 
 		double vel = sqrt(2 * rotational_acc_lim_ * remaining_yaw);
@@ -216,7 +216,7 @@ namespace whi_nav2_bt_actions_server
 			stopRobot();
 			std::string errorMsg("Collision Ahead - Exiting Spin");
 			RCLCPP_WARN(logger_, errorMsg.c_str());
-			return ResultStatus{Status::FAILED, SpinToPathResult::COLLISION_AHEAD, errorMsg};
+			return Status::FAILED;
 		}
 
 		if (vel_pub_)
@@ -228,7 +228,7 @@ namespace whi_nav2_bt_actions_server
 			vel_unstamped_pub_->publish(msgTwist.twist);
 		}
 
-		return ResultStatus{Status::RUNNING, SpinToPathResult::NONE, ""};
+		return Status::RUNNING;
 	}
 
 	bool SpinToPath::isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,
@@ -252,7 +252,7 @@ namespace whi_nav2_bt_actions_server
 				break;
 			}
 
-			if (!local_collision_checker_->isCollisionFree(Pose2d, fetchData))
+			if (!collision_checker_->isCollisionFree(Pose2d, fetchData))
 			{
 				return false;
 			}

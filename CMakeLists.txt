@@ -57,6 +57,11 @@ ament_target_dependencies(spin_to_path ${dependencies})
 # prevent pluginlib from using boost
 target_compile_definitions(spin_to_path PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 
+# add_library(wait_try SHARED plugins/wait_try.cpp)
+# ament_target_dependencies(wait_try ${dependencies})
+# # prevent pluginlib from using boost
+# target_compile_definitions(wait_try PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+
 ament_target_dependencies(${library_name}
   ${dependencies}
 )
@@ -79,7 +84,10 @@ ament_target_dependencies(${executable_name}
 
 target_link_libraries(${executable_name} ${library_name})
 
-install(TARGETS spin_to_path ${library_name}
+install(TARGETS
+  spin_to_path
+  # wait_try
+  ${library_name}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -101,6 +109,7 @@ endif()
 ament_export_include_directories(include)
 ament_export_libraries(
   spin_to_path
+  # wait_try
   ${library_name}
 )
 
