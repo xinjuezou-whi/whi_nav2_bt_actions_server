@@ -50,9 +50,9 @@ namespace whi_nav2_bt_actions_server
 		// Plugins
 		std::vector<pluginlib::UniquePtr<BaseAction>> actions_;
 		pluginlib::ClassLoader<BaseAction> plugin_loader_;
-		std::vector<std::string> default_ids_;
+		std::vector<std::string> default_action_names_;
 		std::vector<std::string> default_types_;
-		std::vector<std::string> action_ids_;
+		std::vector<std::string> action_names_;
 		std::vector<std::string> action_types_;
 
 		// Utilities

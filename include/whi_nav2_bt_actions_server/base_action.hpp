@@ -112,9 +112,7 @@ namespace whi_nav2_bt_actions_server
             node->get_parameter("robot_base_frame", robot_base_frame_);
             node->get_parameter("transform_tolerance", transform_tolerance_);
 
-            action_server_ = std::make_shared<ActionServer>(
-            node, action_name_,
-            std::bind(&BaseActionT::execute, this));
+            action_server_ = std::make_shared<ActionServer>(node, action_name_, std::bind(&BaseActionT::execute, this));
 
             collision_checker_ = CollisionChecker;
         

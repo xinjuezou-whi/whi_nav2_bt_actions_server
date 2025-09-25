@@ -31,7 +31,7 @@ namespace whi_nav2_bt_actions_server
 		: LifecycleNode("whi_nav2_bt_actions_server", "", Options)
 		, plugin_loader_("whi_nav2_bt_actions_server", "whi_nav2_bt_actions_server::BaseAction")
 		// , plugin_loader_("whi_nav2_bt_actions_server", "nav2_core::Behavior")
-		, default_ids_{"SpinToPath"}
+		, default_action_names_{"spin_to_path"}
 		, default_types_{"whi_nav2_bt_actions_server/SpinToPath"}
 	{
 		declare_parameter("local_costmap_topic",
@@ -44,14 +44,14 @@ namespace whi_nav2_bt_actions_server
 		// 	rclcpp::ParameterValue(std::string("global_costmap/published_footprint")));
 
 		declare_parameter("cycle_frequency", rclcpp::ParameterValue(10.0));
-		declare_parameter("action_plugins", default_ids_);
+		declare_parameter("action_plugins", default_action_names_);
 
-		get_parameter("action_plugins", action_ids_);
-		if (action_ids_ == default_ids_)
+		get_parameter("action_plugins", action_names_);
+		if (action_names_ == default_action_names_)
 		{
-			for (size_t i = 0; i < default_ids_.size(); ++i)
+			for (size_t i = 0; i < default_action_names_.size(); ++i)
 			{
-				declare_parameter(default_ids_[i] + ".plugin", default_types_[i]);
+				declare_parameter(default_action_names_[i] + ".plugin", default_types_[i]);
 			}
 		}
 
@@ -91,7 +91,7 @@ namespace whi_nav2_bt_actions_server
 		local_collision_checker_ = std::make_shared<nav2_costmap_2d::CostmapTopicCollisionChecker>(
 			*local_costmap_sub_, *local_footprint_sub_, this->get_name());
 
-		action_types_.resize(action_ids_.size());
+		action_types_.resize(action_names_.size());
 		if (!loadActionPlugins())
 		{
 			on_cleanup(State);
@@ -108,21 +108,21 @@ namespace whi_nav2_bt_actions_server
 	{
 		auto node = shared_from_this();
 
-		for (size_t i = 0; i != action_ids_.size(); i++)
+		for (size_t i = 0; i != action_names_.size(); i++)
 		{
-			action_types_[i] = nav2_util::get_plugin_type_param(node, action_ids_[i]);
+			action_types_[i] = nav2_util::get_plugin_type_param(node, action_names_[i]);
 			try
 			{
 				RCLCPP_INFO(get_logger(), "Creating action plugin %s of type %s",
-					action_ids_[i].c_str(), action_types_[i].c_str());
+					action_names_[i].c_str(), action_types_[i].c_str());
 
 				actions_.push_back(plugin_loader_.createUniqueInstance(action_types_[i]));
-				actions_.back()->configure(node, action_ids_[i], tf_, local_collision_checker_);
+				actions_.back()->configure(node, action_names_[i], tf_, local_collision_checker_);
 			}
 			catch (const pluginlib::PluginlibException & ex)
 			{
 				RCLCPP_FATAL(get_logger(), "\033[1;31m Failed to create action %s of type %s."
-					" Exception: %s \033[0m", action_ids_[i].c_str(), action_types_[i].c_str(),
+					" Exception: %s \033[0m", action_names_[i].c_str(), action_types_[i].c_str(),
 					ex.what());
 				return false;
 			}
