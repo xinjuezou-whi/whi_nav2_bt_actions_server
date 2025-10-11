@@ -26,7 +26,7 @@ namespace whi_nav2_bt_actions_server
 		, feedback_(std::make_shared<SpinToPathAction::Feedback>())
 	{
 		/// node version and copyright announcement
-		std::cout << "\nWHI bt action spin to path VERSION 00.01.1" << std::endl;
+		std::cout << "\nWHI bt action spin to path VERSION 00.01.2" << std::endl;
 		std::cout << "Copyright © 2025-2026 Wheel Hub Intelligent Co.,Ltd. All rights reserved\n" << std::endl;
 	}
 
@@ -51,6 +51,9 @@ namespace whi_nav2_bt_actions_server
 
 		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".rotational_acc_lim", rclcpp::ParameterValue(1.57));
 		node->get_parameter(action_name_ + ".rotational_acc_lim", rotational_acc_lim_);
+
+		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".check_collision", rclcpp::ParameterValue(true));
+		node->get_parameter(action_name_ + ".check_collision", check_collision_);
 	}
 
     static double angleBetweenVectors2D(const geometry_msgs::msg::Point& From,
@@ -234,6 +237,11 @@ namespace whi_nav2_bt_actions_server
 	bool SpinToPath::isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,
 		geometry_msgs::msg::Pose2D& Pose2d)
 	{
+		if (!check_collision_)
+		{
+			return true;
+		}
+
 		// Simulate ahead by simulate_ahead_time_ in cycle_frequency_ increments
 		int cycleCount = 0;
 		double simPositionChange;

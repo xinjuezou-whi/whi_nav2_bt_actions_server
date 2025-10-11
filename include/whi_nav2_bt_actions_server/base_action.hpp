@@ -287,6 +287,7 @@ namespace whi_nav2_bt_actions_server
         std::string robot_base_frame_{ "base_link" };
         double transform_tolerance_{ 0.2 };
         rclcpp::Duration elasped_time_{0, 0};
+        bool check_collision_{ true };
 
         // Clock
         rclcpp::Clock::SharedPtr clock_;
