@@ -57,6 +57,11 @@ ament_target_dependencies(spin_to_path ${dependencies})
 # prevent pluginlib from using boost
 target_compile_definitions(spin_to_path PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 
+add_library(locomotion_offset SHARED plugins/locomotion_offset.cpp)
+ament_target_dependencies(locomotion_offset ${dependencies})
+# prevent pluginlib from using boost
+target_compile_definitions(locomotion_offset PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+
 # add_library(wait_try SHARED plugins/wait_try.cpp)
 # ament_target_dependencies(wait_try ${dependencies})
 # # prevent pluginlib from using boost
@@ -86,6 +91,7 @@ target_link_libraries(${executable_name} ${library_name})
 
 install(TARGETS
   spin_to_path
+  locomotion_offset
   # wait_try
   ${library_name}
   ARCHIVE DESTINATION lib
@@ -109,6 +115,7 @@ endif()
 ament_export_include_directories(include)
 ament_export_libraries(
   spin_to_path
+  locomotion_offset
   # wait_try
   ${library_name}
 )

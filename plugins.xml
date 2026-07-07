@@ -6,4 +6,11 @@
 		<description>Spin to align with the planned path</description>
 	  </class>
 	</library>
+	<library path="locomotion_offset">
+	  <class name="whi_nav2_bt_actions_server/LocomotionOffset"
+             type="whi_nav2_bt_actions_server::LocomotionOffset"
+             base_class_type="whi_nav2_bt_actions_server::BaseAction">
+		<description>Adjust locomotion offset</description>
+	  </class>
+	</library>
 </class_libraries>

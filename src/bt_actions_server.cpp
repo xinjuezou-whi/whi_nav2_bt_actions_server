@@ -31,8 +31,8 @@ namespace whi_nav2_bt_actions_server
 		: LifecycleNode("whi_nav2_bt_actions_server", "", Options)
 		, plugin_loader_("whi_nav2_bt_actions_server", "whi_nav2_bt_actions_server::BaseAction")
 		// , plugin_loader_("whi_nav2_bt_actions_server", "nav2_core::Behavior")
-		, default_action_names_{"spin_to_path"}
-		, default_types_{"whi_nav2_bt_actions_server/SpinToPath"}
+		, default_action_names_{"spin_to_path", "locomotion_offset"}
+		, default_types_{"whi_nav2_bt_actions_server/SpinToPath", "whi_nav2_bt_actions_server/LocomotionOffset"}
 	{
 		declare_parameter("local_costmap_topic",
 			rclcpp::ParameterValue(std::string("local_costmap/costmap_raw")));
