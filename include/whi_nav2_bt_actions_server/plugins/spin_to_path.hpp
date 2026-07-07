@@ -5,7 +5,7 @@ Features:
 - spin to align with the planned path
 - xxx
 
-Written by Xinjue Zou, xinjue.zou@outlook.com
+Written by Xinjue Zou, xinjue.zou.whi@gmail.com
 
 GNU General Public License, check LICENSE for more information.
 All text above must be included in any redistribution.
