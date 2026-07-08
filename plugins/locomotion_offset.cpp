@@ -26,7 +26,7 @@ namespace whi_nav2_bt_actions_server
 		, feedback_(std::make_shared<LocomotionOffsetAction::Feedback>())
 	{
 		/// node version and copyright announcement
-		std::cout << "\nWHI bt action locomotion offset VERSION 00.01.1" << std::endl;
+		std::cout << "\nWHI bt action locomotion offset VERSION 00.01.2" << std::endl;
 		std::cout << "Copyright © 2025-2026 Wheel Hub Intelligent Co.,Ltd. All rights reserved\n" << std::endl;
 	}
 
@@ -59,6 +59,9 @@ namespace whi_nav2_bt_actions_server
 		double yawTolerance;
 		node->get_parameter(action_name_ + ".yaw_tolerance", yawTolerance);
 		yaw_tolerance_ = angles::from_degrees(yawTolerance);
+
+		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".default_timeout", rclcpp::ParameterValue(50.0));
+		node->get_parameter(action_name_ + ".default_timeout", default_timeout_);
 
 		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".check_collision", rclcpp::ParameterValue(true));
 		node->get_parameter(action_name_ + ".check_collision", check_collision_);
@@ -124,12 +127,12 @@ namespace whi_nav2_bt_actions_server
 		const double xOffset = Command->offset.pose.position.x;
 		const double yOffset = Command->offset.pose.position.y;
 		const double yawOffset = tf2::getYaw(Command->offset.pose.orientation);
-		const double currentYaw = tf2::getYaw(currentPose.pose.orientation);
+		timeout_ = Command->timeout > 0.1 ? Command->timeout : default_timeout_;
 
 		// compute target position in map frame
+		const double currentYaw = tf2::getYaw(currentPose.pose.orientation);
 		target_pose_.pose.position.x += cos(currentYaw) * xOffset - sin(currentYaw) * yOffset;
 		target_pose_.pose.position.y += sin(currentYaw) * xOffset + cos(currentYaw) * yOffset;
-
 		tf2::Quaternion q;
 		q.setRPY(0, 0, currentYaw + yawOffset);
 		target_pose_.pose.orientation = tf2::toMsg(q);
@@ -143,11 +146,41 @@ namespace whi_nav2_bt_actions_server
 		double directionError = angles::shortest_angular_distance(0.0, direction);
 		// Decide forward/backward
 		move_backward_ = fabs(directionError) > M_PI_2;
+
 		approach_yaw_ = angles::normalize_angle(currentYaw + direction);
-		if (move_backward_)
+
+		if (Command->zig_angle > 0.0)
 		{
-			approach_yaw_ = angles::normalize_angle(approach_yaw_ + M_PI);
+			double zigAngle = angles::from_degrees(Command->zig_angle);
+			zigAngle = directionError > 0.0 ? zigAngle : -zigAngle;
+			zigAngle = move_backward_ ? -zigAngle : zigAngle;
+			if (fabs(yOffset) > 1e-3)
+			{
+				double midXOffset = yOffset / tan(zigAngle);
+				mid_target_pose_ = std::make_shared<geometry_msgs::msg::PoseStamped>();
+				mid_target_pose_->pose.position.x = currentPose.pose.position.x + cos(currentYaw) * midXOffset - sin(currentYaw) * yOffset;
+				mid_target_pose_->pose.position.y = currentPose.pose.position.y + sin(currentYaw) * midXOffset + cos(currentYaw) * yOffset;
+				mid_target_pose_->pose.orientation = currentPose.pose.orientation;
+
+				approach_yaw_ = angles::normalize_angle(currentYaw + zigAngle);
+			}
+			else
+			{
+				if (move_backward_)
+				{
+					approach_yaw_ = angles::normalize_angle(approach_yaw_ + M_PI);
+				}
+			}
 		}
+		else
+		{
+			if (move_backward_)
+			{
+				approach_yaw_ = angles::normalize_angle(approach_yaw_ + M_PI);
+			}
+		}
+
+		start_time_ = clock_->now();
 		// Always rotate first
 		state_ = State::ROTATE_TO_APPROACH;
 
@@ -158,12 +191,21 @@ namespace whi_nav2_bt_actions_server
 
 	Status LocomotionOffset::onCycleUpdate()
 	{
+		if ((clock_->now() - start_time_).seconds() > timeout_)
+		{
+			RCLCPP_ERROR_STREAM(logger_, "controlling timeout, " << timeout_ << " seconds");
+			feedback_->state = whi_interfaces::action::LocomotionOffset::Feedback::PROC_TIMEOUT;
+			action_server_->publish_feedback(feedback_);
+			return Status::FAILED;
+		}
+
 		geometry_msgs::msg::PoseStamped currentPose;
 		if (!nav2_util::getCurrentPose(currentPose, *tf_, global_frame_, robot_base_frame_,
 			transform_tolerance_))
 		{
-			std::string errorMsg("Current robot pose is not available.");
-			RCLCPP_ERROR(logger_, errorMsg.c_str());
+			RCLCPP_ERROR(logger_, "Current robot pose is not available");
+			feedback_->state = whi_interfaces::action::LocomotionOffset::Feedback::PROC_FAILED;
+			action_server_->publish_feedback(feedback_);
 			return Status::FAILED;
 		}
 
@@ -174,6 +216,12 @@ namespace whi_nav2_bt_actions_server
 		{
 		case State::ROTATE_TO_APPROACH:
 			rotateToApproach(currentPose);
+			break;
+		case State::MOVE_TO_MID_TARGET:
+			moveToMidTarget(currentPose);
+			break;
+		case State::ROTATE_TO_MID_TARGET:
+			rotateToMidTarget(currentPose);
 			break;
 		case State::MOVE_TO_TARGET:
 			moveToTarget(currentPose);
@@ -186,8 +234,9 @@ namespace whi_nav2_bt_actions_server
 			break;
 		default:
 			// undefined state
+			feedback_->state = whi_interfaces::action::LocomotionOffset::Feedback::PROC_FAILED;
+			action_server_->publish_feedback(feedback_);
 			return Status::FAILED;
-			break;
 		}
 
 		cmd_twist_.header.stamp = clock_->now();
@@ -202,10 +251,14 @@ namespace whi_nav2_bt_actions_server
 
 		if (state_ == State::FINISHED)
 		{
+			feedback_->state = whi_interfaces::action::LocomotionOffset::Feedback::PROC_SUCCEED;
+			action_server_->publish_feedback(feedback_);
 			return Status::SUCCEEDED;
 		}
 		else
 		{
+			feedback_->state = whi_interfaces::action::LocomotionOffset::Feedback::PROC_ACTING;
+			action_server_->publish_feedback(feedback_);
 			return Status::RUNNING;
 		}
 	}
@@ -215,6 +268,57 @@ namespace whi_nav2_bt_actions_server
 		const double currentYaw = tf2::getYaw(CurrentPose.pose.orientation);
 
 		double error = angles::shortest_angular_distance(currentYaw, approach_yaw_);
+		if (fabs(error) < yaw_tolerance_)
+		{
+			state_ = mid_target_pose_ ? State::MOVE_TO_MID_TARGET : State::MOVE_TO_TARGET;
+			return;
+		}
+
+		double magnitude = std::clamp(fabs(error), min_rotational_vel_, max_rotational_vel_);
+		cmd_twist_.twist.angular.z = std::copysign(magnitude, error);
+	}
+
+	void LocomotionOffset::moveToMidTarget(const geometry_msgs::msg::PoseStamped& CurrentPose)
+	{
+		double dx = mid_target_pose_->pose.position.x - CurrentPose.pose.position.x;
+		double dy = mid_target_pose_->pose.position.y - CurrentPose.pose.position.y;
+		double distance = std::hypot(dx, dy);
+		if (distance < position_tolerance_)
+		{
+			state_ = State::ROTATE_TO_MID_TARGET;
+			return;
+		}
+
+		// Direction from robot to target in global frame
+		double targetDirection = atan2(dy, dx);
+		// Decide robot heading while moving
+		double desiredHeading = targetDirection;
+		if (move_backward_)
+		{
+			desiredHeading = angles::normalize_angle(targetDirection + M_PI);
+		}
+		double currentYaw = tf2::getYaw(CurrentPose.pose.orientation);
+		double headingError = angles::shortest_angular_distance(currentYaw, desiredHeading);
+#ifdef DEBUG
+	std::cout << "middddddddddddddddddddddddddddddd backword " << (move_backward_ ? "true" : "false") <<
+		" curYaw: " << angles::to_degrees(currentYaw) <<
+		", targetDir: " << angles::to_degrees(targetDirection) <<
+		", desired: " << angles::to_degrees(desiredHeading) <<
+		", headErr: " << angles::to_degrees(headingError) << std::endl;
+#endif
+
+		double linear = std::clamp(distance, min_linear_vel_, max_linear_vel_);
+		double angular = std::clamp(fabs(headingError), min_rotational_vel_, max_rotational_vel_);
+		cmd_twist_.twist.linear.x = move_backward_ ? -linear : linear;
+		cmd_twist_.twist.angular.z = std::copysign(angular, headingError);
+	}
+	
+	void LocomotionOffset::rotateToMidTarget(const geometry_msgs::msg::PoseStamped& CurrentPose)
+	{
+		const double targetYaw = tf2::getYaw(mid_target_pose_->pose.orientation);
+		const double currentYaw = tf2::getYaw(CurrentPose.pose.orientation);
+
+		double error = angles::shortest_angular_distance(currentYaw, targetYaw);
 		if (fabs(error) < yaw_tolerance_)
 		{
 			state_ = State::MOVE_TO_TARGET;
@@ -233,23 +337,47 @@ namespace whi_nav2_bt_actions_server
 		if (distance < position_tolerance_)
 		{
 			state_ = State::FINAL_ROTATE;
+			if (mid_target_pose_)
+			{
+				mid_target_pose_ = nullptr;
+			}
 			return;
 		}
 
 		// Direction from robot to target in global frame
 		double targetDirection = atan2(dy, dx);
 		// Decide robot heading while moving
+		bool backward = false;
 		double desiredHeading = targetDirection;
-		if (move_backward_)
+		if (mid_target_pose_)
 		{
-			desiredHeading = angles::normalize_angle(targetDirection + M_PI);
+			if (fabs(atan2(dy, dx)) > M_PI_2)
+			{
+				backward = true;
+				desiredHeading = angles::normalize_angle(targetDirection + M_PI);
+			}
+		}
+		else
+		{
+			backward = move_backward_;
+			if (move_backward_)
+			{
+				desiredHeading = angles::normalize_angle(targetDirection + M_PI);
+			}
 		}
 		double currentYaw = tf2::getYaw(CurrentPose.pose.orientation);
 		double headingError = angles::shortest_angular_distance(currentYaw, desiredHeading);
+#ifdef DEBUG
+	std::cout << "mmmmmmmmmmmmmmmmmmmmmmmmmmmmm backword " << (backward ? "true" : "false") <<
+		" curYaw: " << angles::to_degrees(currentYaw) <<
+		", targetDir: " << angles::to_degrees(targetDirection) <<
+		", desired: " << angles::to_degrees(desiredHeading) <<
+		", headErr: " << angles::to_degrees(headingError) << std::endl;
+#endif
 
 		double linear = std::clamp(distance, min_linear_vel_, max_linear_vel_);
 		double angular = std::clamp(fabs(headingError), min_rotational_vel_, max_rotational_vel_);
-		cmd_twist_.twist.linear.x = move_backward_ ? -linear : linear;
+		cmd_twist_.twist.linear.x = backward ? -linear : linear;
 		cmd_twist_.twist.angular.z = std::copysign(angular, headingError);
 	}
 
