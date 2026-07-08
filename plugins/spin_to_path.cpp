@@ -40,9 +40,6 @@ namespace whi_nav2_bt_actions_server
 			throw std::runtime_error{"Failed to lock node"};
 		}
 
-		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".simulate_ahead_time", rclcpp::ParameterValue(2.0));
-		node->get_parameter(action_name_ + ".simulate_ahead_time", simulate_ahead_time_);
-
 		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".min_rotational_vel", rclcpp::ParameterValue(0.1));
 		node->get_parameter(action_name_ + ".min_rotational_vel", min_rotational_vel_);
 
@@ -51,6 +48,9 @@ namespace whi_nav2_bt_actions_server
 
 		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".rotational_acc_lim", rclcpp::ParameterValue(1.57));
 		node->get_parameter(action_name_ + ".rotational_acc_lim", rotational_acc_lim_);
+
+		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".simulate_ahead_time", rclcpp::ParameterValue(2.0));
+		node->get_parameter(action_name_ + ".simulate_ahead_time", simulate_ahead_time_);
 
 		nav2_util::declare_parameter_if_not_declared(node, action_name_ + ".check_collision", rclcpp::ParameterValue(true));
 		node->get_parameter(action_name_ + ".check_collision", check_collision_);
@@ -114,9 +114,7 @@ namespace whi_nav2_bt_actions_server
 		if (!nav2_util::getCurrentPose(currentPose, *tf_, global_frame_, robot_base_frame_,
 			transform_tolerance_))
 		{
-			std::string errorMsg("Current robot pose is not available.");
-			RCLCPP_ERROR(logger_, errorMsg.c_str());
-
+			RCLCPP_ERROR(logger_, "Current robot pose is not available");
 			return Status::FAILED;
 		}
 
@@ -176,8 +174,7 @@ namespace whi_nav2_bt_actions_server
 		if (!nav2_util::getCurrentPose(currentPose, *tf_, global_frame_, robot_base_frame_,
 			transform_tolerance_))
 		{
-			std::string errorMsg("Current robot pose is not available.");
-			RCLCPP_ERROR(logger_, errorMsg.c_str());
+			RCLCPP_ERROR(logger_, "Current robot pose is not available");
 			return Status::FAILED;
 		}
 
@@ -213,12 +210,13 @@ namespace whi_nav2_bt_actions_server
 		pose2d.x = currentPose.pose.position.x;
 		pose2d.y = currentPose.pose.position.y;
 		pose2d.theta = tf2::getYaw(currentPose.pose.orientation);
-
 		if (!isCollisionFree(relative_yaw_, msgTwist.twist, pose2d))
 		{
 			stopRobot();
-			std::string errorMsg("Collision Ahead - Exiting Spin");
-			RCLCPP_WARN(logger_, errorMsg.c_str());
+
+            RCLCPP_ERROR_STREAM(logger_, "\033[1;31m" <<
+				"Collision Ahead - Exiting LocomotionOffset"
+				<< "\033[0m");
 			return Status::FAILED;
 		}
 
@@ -235,7 +233,7 @@ namespace whi_nav2_bt_actions_server
 	}
 
 	bool SpinToPath::isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,
-		geometry_msgs::msg::Pose2D& Pose2d)
+		geometry_msgs::msg::Pose2D& CurrentPose)
 	{
 		if (!check_collision_)
 		{
@@ -246,25 +244,25 @@ namespace whi_nav2_bt_actions_server
 		int cycleCount = 0;
 		double simPositionChange;
 		const int maxCycleCount = static_cast<int>(cycle_frequency_ * simulate_ahead_time_);
-		geometry_msgs::msg::Pose2D initPose = Pose2d;
-		bool fetchData = true;
+		geometry_msgs::msg::Pose2D initPose = CurrentPose;
+		bool fetchCostmap = true;
 
 		while (cycleCount < maxCycleCount)
 		{
 			simPositionChange = CmdVel.angular.z * (cycleCount / cycle_frequency_);
-			Pose2d.theta = initPose.theta + simPositionChange;
+			CurrentPose.theta = initPose.theta + simPositionChange;
 			cycleCount++;
 
-			if (abs(RelativeYaw) - abs(simPositionChange) <= 0.)
+			if (std::abs(simPositionChange) >= std::abs(RelativeYaw))
 			{
 				break;
 			}
 
-			if (!collision_checker_->isCollisionFree(Pose2d, fetchData))
+			if (!collision_checker_->isCollisionFree(CurrentPose, fetchCostmap))
 			{
 				return false;
 			}
-			fetchData = false;
+			fetchCostmap = false;
 		}
 		return true;
 	}

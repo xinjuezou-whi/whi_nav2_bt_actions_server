@@ -41,7 +41,7 @@ namespace whi_nav2_bt_actions_server
 
 	protected:
 		bool isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,
-			geometry_msgs::msg::Pose2D& Pose2d);
+			geometry_msgs::msg::Pose2D& CurrentPose);
 
 		SpinToPathAction::Feedback::SharedPtr feedback_{ nullptr };
 

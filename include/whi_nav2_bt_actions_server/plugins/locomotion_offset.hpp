@@ -45,8 +45,8 @@ namespace whi_nav2_bt_actions_server
 		void rotateToMidTarget(const geometry_msgs::msg::PoseStamped& CurrentPose);
 		void moveToTarget(const geometry_msgs::msg::PoseStamped& CurrentPose);
 		void rotateToFinal(const geometry_msgs::msg::PoseStamped& CurrentPose);
-		bool isCollisionFree(const double& RelativeYaw, const geometry_msgs::msg::Twist& CmdVel,
-			geometry_msgs::msg::Pose2D& Pose2d);
+		bool isCollisionFree(const geometry_msgs::msg::Twist& CmdVel,
+			const geometry_msgs::msg::PoseStamped& CurrentPose);
 
 		LocomotionOffsetAction::Feedback::SharedPtr feedback_{ nullptr };
 
