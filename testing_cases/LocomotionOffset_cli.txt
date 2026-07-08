@@ -1,0 +1,65 @@
+/// y only
+// positive
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.0, y: 0.25, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
+// negative
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.0, y: -0.25, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
+
+/// x only
+// positive
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.25, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
+// negative
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.25, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
+
+/// x and y
+// up-left
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.2, y: 0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
+// up-right
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.2, y: -0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
+// down-right
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.2, y: -0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
+// down-left
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.2, y: 0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}"
+
+/// with yaw
+// up-left 45degree
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.2, y: 0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.382683, w: 0.923880}}}}"
+// up-left -45degree
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.2, y: 0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: -0.382683, w: 0.923880}}}}"
+// down-right 45degree
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.2, y: -0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.382683, w: 0.923880}}}}"
+// down-right -45degree
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.2, y: -0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: -0.382683, w: 0.923880}}}}"
+
+
+////// zig angle
+/// y only
+// positive
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.0, y: 0.25, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, zig_angle: 45}"
+// negative
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.0, y: -0.25, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, zig_angle: 45}"
+
+/// x only
+// positive
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.25, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, zig_angle: 45}"
+// negative
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.25, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, zig_angle: 45}"
+
+/// x and y
+// up-left
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.2, y: 0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, zig_angle: 30}"
+// up-right
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.2, y: -0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, zig_angle: 30}"
+// down-right
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.2, y: -0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, zig_angle: 30}"
+// down-left
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.2, y: 0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, zig_angle: 30}"
+
+/// with yaw
+// up-left 45degree
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.2, y: 0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.382683, w: 0.923880}}}, zig_angle: 30}"
+// up-left -45degree
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.2, y: 0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: -0.382683, w: 0.923880}}}, zig_angle: 30}"
+// down-right 45degree
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.2, y: -0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.382683, w: 0.923880}}}, zig_angle: 30}"
+// down-right -45degree
+ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: -0.2, y: -0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: -0.382683, w: 0.923880}}}, zig_angle: 30}"
