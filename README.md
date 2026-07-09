@@ -6,7 +6,7 @@ Providing action-based controllers for mobile robots within the Nav2 framework
 
 Calculates the heading difference between the robot and a specified point on the global path, then rotates the robot toward the target path point defined by the lookahead distance
 
-Advertised action **SpinToPath**
+Advertised action **SpinToPath** with name `spin_to_path`
 
 ```
 #goal definition
@@ -27,7 +27,7 @@ This action enables the robot to move to a target pose defined by an offset rela
 1. **Direct mode**: The robot moves directly toward the target pose while maintaining the shortest path.
 2. **Zigzag mode**: The robot first rotates to an appropriate orientation to increase maneuverability, then executes the translation toward the target pose.
 
-Advertised action **LocomotionOffset**
+Advertised action **LocomotionOffset** with name `locomotion_offset`
 
 ```
 #goal definition
