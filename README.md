@@ -46,9 +46,23 @@ uint8 PROC_ACTING=3
 uint8 state
 ```
 
-When `zig_angle` is zero, **Direct mode** is selected automatically. Otherwise, **Zigzag mode** is executed with the specified intermediate rotation angle (`zig_angle`).
+When `zig_angle` is zero, **Direct mode** is selected automatically. Otherwise, **Zigzag mode** is executed with the specified intermediate rotation angle (`zig_angle`)
 
-An example of action call with CLI:
+Taking the y offset(0.5m) as an example to illustrate the difference of two modes:
+
+**Direct mode**
+
+<p>
+<img width="905" height="654" alt="directly" src="https://github.com/user-attachments/assets/89be9c31-3684-4619-913d-15a8961f2d25" />
+</p>
+
+**Zigzag mode** with 45 degrees
+
+<p>
+<img width="905" height="654" alt="zigzag" src="https://github.com/user-attachments/assets/b551edfa-fd06-4b5e-b84a-1e8a2b3cb776" />
+</p>
+
+An example of an action call with CLI:
 
 ```
 # up-left under zigzag mode
