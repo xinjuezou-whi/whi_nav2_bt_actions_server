@@ -69,4 +69,4 @@ An example of an action call with CLI:
 ros2 action send_goal /locomotion_offset whi_interfaces/action/LocomotionOffset "{offset: {header: {frame_id: 'base_link'}, pose: {position: {x: 0.2, y: 0.2, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, zig_angle: 30}"
 ```
 
-> Refer to `testing_cases` for more action calls
+> Refer to `testing_cases` for more action call examples
