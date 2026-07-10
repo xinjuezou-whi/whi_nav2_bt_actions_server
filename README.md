@@ -2,6 +2,38 @@
 
 Providing action-based controllers for mobile robots within the Nav2 framework
 
+## Params
+
+```
+whi_nav2_bt_actions_server:
+  ros__parameters:
+    use_stamped_vel: true
+    cycle_frequency: 20.0
+    global_frame: odom
+    robot_base_frame: base_link
+    transform_tolerance: 0.2
+    local_costmap_topic: local_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    action_plugins: ["spin_to_path", "locomotion_offset"]
+    spin_to_path:
+      plugin: whi_nav2_bt_actions_server/SpinToPath
+      min_rotational_vel: 0.1
+      max_rotational_vel: 0.3
+      rotational_acc_lim: 1.57
+      simulate_ahead_time: 2.0
+      check_collision: false
+    locomotion_offset:
+      plugin: whi_nav2_bt_actions_server/LocomotionOffset
+      min_rotational_vel: 0.05
+      max_rotational_vel: 0.2
+      min_linear_vel: 0.05
+      max_linear_vel: 0.1
+      position_tolerance: 0.05
+      yaw_tolerance: 5.0 # degrees
+      simulate_ahead_time: 2.0
+      check_collision: false
+```
+
 ## SpinToPath
 
 Calculates the heading difference between the robot and a specified point on the global path, then rotates the robot toward the target path point defined by the lookahead distance
